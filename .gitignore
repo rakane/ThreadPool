@@ -1,4 +1,4 @@
 a.out
 .vscode
-*.gch
+*.h.gch
 *.o
