@@ -15,7 +15,7 @@ public:
 
 void printThing() 
 {
-    std::cout << "printThing() called" << "\n";
+    std::cout << "Thing" << "\n";
 }
 
 void addThing(int a, int b)
