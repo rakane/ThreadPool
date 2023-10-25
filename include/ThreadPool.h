@@ -14,21 +14,36 @@ namespace Threads {
 
     class ThreadPool {
     public:
+        // Constructor
         ThreadPool(const unsigned int numThreads);
+
+        // Destructor
         ~ThreadPool();
 
         // Shutdown thread pool
         void shutdown();
 
-        // Get number of threads in pool
+        // Clear job queue
+        void clear();
+
+        // Get number of queued jobs
         size_t numQueuedJobs() const;
 
+        // Get number of threads in pool
         unsigned int numThreads() const;
 
         // Add job to task queue, returning future
         template<typename F, typename ...Args>
         std::future<std::invoke_result_t<F, Args...>> addJob(F&& f, Args&&... args)
         {
+            // Only add job if pool is running
+            PoolStatus status = getStatus();
+
+            if(status == PoolStatus::TERMINATED)
+            {
+                return std::future<std::invoke_result_t<F, Args...>>();
+            }
+
             // Bind arguments to function
             std::function<decltype(f(args...))()> func = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
 
@@ -60,10 +75,13 @@ namespace Threads {
         enum PoolStatus
         {
             RUNNING = 0,
-            TERMINATE = 1
+            TERMINATED = 1
         };
 
+        // Get pool status
         PoolStatus getStatus() const;
+
+        // Set pool status
         void setStatus(PoolStatus status);
 
         // Wait for work

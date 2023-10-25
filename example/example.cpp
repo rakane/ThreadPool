@@ -7,28 +7,10 @@
 class MyClass
 {
 public:
-    MyClass(): count_(0) {}
+    MyClass() {}
     ~MyClass() {}
-
-    void increment() 
-    {   
-        std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "increment(): " << count_ << " -> " << count_ + 1 << "\n";
-        count_++; 
-    }
-
-    void add(unsigned int num) 
-    { 
-        std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "add(): " << count_ << " + " << num << " = " << count_ + num << "\n";
-        count_ += num;
-    }
-
-private:
-    // User must implement thread safety on objects used in thread pool
-    mutable std::mutex mutex_;
-
-    unsigned int count_;
+    void func1() { }
+    void func2(unsigned int num) { }
 };
 
 void printThing() 
@@ -47,6 +29,11 @@ int addThingResult(int a, int b)
     return a + b;
 }
 
+void myWait(unsigned int microseconds)
+{
+    usleep(microseconds);
+}
+
 int main(int argc, char** argv)
 {
     // Construct pool with 2 threads, threads started immediately
@@ -62,16 +49,26 @@ int main(int argc, char** argv)
     // Invoke methods on objects using std::bind and std::function
     MyClass myClass;
 
-    std::function<void()> f = std::bind(&MyClass::increment, &myClass);
+    std::function<void()> f = std::bind(&MyClass::func1, &myClass);
     pool.addJob(f);
 
-    std::function<void(unsigned int)> f2 = std::bind(&MyClass::add, &myClass, std::placeholders::_1);
+    std::function<void(unsigned int)> f2 = std::bind(&MyClass::func2, &myClass, std::placeholders::_1);
     pool.addJob(f2, 10);
 
-    // Return future from job, print result
+    // Return future from job
     std::future<int> future = pool.addJob(addThingResult, 1, 2);
-    int result = future.get();
-    std::cout << "Result: " << result << std::endl;
+
+    // If pool is shutdown or cleared prior to job completion, future will be invalid
+    try 
+    {
+        int result = future.get();
+        std::cout << "Result: " << result << std::endl;
+    }
+    catch(const std::future_error& e)
+    {
+        // Future invalid, job not completed
+        std::cout << "Exception: " << e.what() << std::endl;
+    }
 
     // Can query number of jobs in queue
     while(pool.numQueuedJobs() > 0)
@@ -82,6 +79,11 @@ int main(int argc, char** argv)
 
     // Terminating the pool will stop all further queuing and processing of jobs
     pool.shutdown();
+
+    // Attempting to queue a job after the pool is terminated will return an invalid future,
+    // and the job will not be queued
+    future = pool.addJob(addThingResult, 1, 2);
+    std::cout << "Future valid: " << future.valid() << std::endl;
 
     return 0;
 }
